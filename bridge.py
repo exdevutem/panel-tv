@@ -26,6 +26,7 @@ Configuración (variables de entorno)
   NOTION_TOKEN      token de una integración de Notion con acceso al Directorio
   NOTION_DATA_SOURCE  por defecto: 0484b0f2-9ac5-4edb-ab1c-bbfffaced2c8 (Directorio)
   PANEL_KEY         (opcional) clave que debe enviar quien haga POST /api/room (cabecera X-Panel-Key)
+  LIVE_MIN_SECONDS  (opcional) duración sobre la cual se considera "en vivo" (por defecto 43200 = 12 h)
   PORT              por defecto 8080
   TZ_NAME           por defecto America/Santiago
 
@@ -45,6 +46,7 @@ HA_ROOM_ENTITY = os.environ.get('HA_ROOM_ENTITY', '')
 NOTION_TOKEN = os.environ.get('NOTION_TOKEN', '')
 NOTION_DS = os.environ.get('NOTION_DATA_SOURCE', '0484b0f2-9ac5-4edb-ab1c-bbfffaced2c8')
 PANEL_KEY = os.environ.get('PANEL_KEY', '')
+LIVE_MIN_SECONDS = int(os.environ.get('LIVE_MIN_SECONDS', '43200'))   # duración mayor a esto = transmisión en vivo
 PORT = int(os.environ.get('PORT', '8080'))
 TZ = ZoneInfo(os.environ.get('TZ_NAME', 'America/Santiago'))
 NOTION_ORG = '✨ ExDev ✨'
@@ -89,12 +91,23 @@ def get_music():
     except Exception as e:
         return 'error', str(e)
     a = s.get('attributes', {})
-    art = '/api/art?v=' + urllib.parse.quote(str(a.get('media_title', ''))) if a.get('entity_picture') else None
+    pic = a.get('entity_picture')
+    if not pic:
+        art = None
+    elif pic.startswith(('http://', 'https://')):
+        art = pic          # imagen remota (p. ej. miniatura de YouTube): el navegador la carga directo
+    else:
+        art = '/api/art?v=' + urllib.parse.quote(str(a.get('media_title', '')))   # ruta local de HA: se sirve por el puente
+    duration, position = a.get('media_duration'), a.get('media_position')
+    # Los directos de YouTube reportan duración/posición absurdas (días); se marcan como "en vivo" y se descartan
+    live = bool(duration) and float(duration) > LIVE_MIN_SECONDS
+    if live:
+        duration = position = None
     return 'ok', {
         'state': s.get('state'),
         'title': a.get('media_title'), 'artist': a.get('media_artist') or a.get('media_album_artist'),
-        'album': a.get('media_album_name'), 'art': art,
-        'duration': a.get('media_duration'), 'position': a.get('media_position'),
+        'album': a.get('media_album_name'), 'art': art, 'live': live,
+        'duration': duration, 'position': position,
         'position_at': a.get('media_position_updated_at'),
     }
 

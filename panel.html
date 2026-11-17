@@ -140,6 +140,9 @@ main{display:grid;grid-template-columns:560px minmax(0,1fr) 520px;gap:28px;heigh
 .prog{display:flex;align-items:center;gap:16px;margin-top:16px;font-size:21px;color:var(--sec);font-variant-numeric:tabular-nums;flex:none}
 .bar{flex:1;height:8px;border-radius:4px;background:var(--gray);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--grad);border-radius:4px;transition:width .9s linear}
+.livebar{height:28px;gap:12px;color:var(--sec)}
+.livebar .dot{width:12px;height:12px;border-radius:50%;background:var(--utem-green);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* ---------- Sala ---------- */
 .room{flex:1}
@@ -309,8 +312,10 @@ let DATA = null, DEMO = false, BRIDGE_OK = false;
 function renderMusic(m, src){
   const el = $('music');
   const playing = m && m.state === 'playing', paused = m && m.state === 'paused';
+  // Directo: el puente lo marca; si no, se deduce de una duración absurda (> 12 h)
+  const live = !!m && (m.live === true || +m.duration > 43200);
   let pill = '<span class="pill off">Sin música</span>';
-  if (playing) pill = '<span class="pill live">Sonando</span>';
+  if (playing) pill = `<span class="pill live">${live ? 'En vivo' : 'Sonando'}</span>`;
   else if (paused) pill = '<span class="pill">En pausa</span>';
   if (src === 'error') pill = '<span class="pill off">Sin conexión</span>';
   if (!m || !(playing || paused) || !m.title){
@@ -329,7 +334,9 @@ function renderMusic(m, src){
         <div class="eq ${playing ? 'on' : ''}"><i></i><i></i><i></i><i></i><i></i></div>
       </div>
     </div>
-    <div class="prog"><span id="pPos">0:00</span><div class="bar"><i id="pBar"></i></div><span id="pDur">0:00</span></div>`;
+    ${live
+      ? '<div class="prog livebar"><span class="dot"></span><span>Transmisión en vivo</span></div>'
+      : '<div class="prog"><span id="pPos">0:00</span><div class="bar"><i id="pBar"></i></div><span id="pDur">0:00</span></div>'}`;
   tickProgress();
 }
 function tickProgress(){
